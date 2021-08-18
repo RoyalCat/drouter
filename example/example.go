@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/royalcat/drouter"
 )
 
@@ -36,32 +37,43 @@ func main() {
 
 	routes := drouter.DRouter{
 		Host:        "localhost",
-		InitPath:    "/v1",
-		InitHandler: &requestInit,
-		NextNodes: []drouter.RouterNode{
-			{
-				Wrapper: &tokenWrapper,
-				NextNodes: []drouter.RouterNode{
-					{
-						PathPart:  "/user/:userId",
-						NextNodes: []drouter.RouterNode{},
-					},
-					{
-						PathPart: "/cars",
-						EndPoint: &drouter.EndPoint{
-							Method:  "GET",
-							Handler: typesHandler,
+		Verbose:     true,
+		InitWrapper: &requestInit,
+		RouterNode: drouter.RouterNode{
+			PathPart: "/v1",
+			NextNodes: []drouter.RouterNode{
+				{
+					Wrapper: &tokenWrapper,
+					NextNodes: []drouter.RouterNode{
+						{
+							PathPart:  "/user/:userId",
+							NextNodes: []drouter.RouterNode{},
 						},
-					},
-					{
-						PathPart: "/sensors",
+						{
+							PathPart: "/cars",
+							EndPoint: &drouter.EndPoint{
+								Method:  "GET",
+								Handler: typesHandler,
+							},
+						},
+						{
+							PathPart: "/users",
+							EndPoint: &drouter.EndPoint{
+								Method:  "GET",
+								Handler: typesHandler,
+							},
+						},
+						{
+							PathPart: "/sensors",
+						},
 					},
 				},
 			},
 		},
 	}
 
-	router, _ := routes.InitRouter()
+	router := httprouter.New()
+	_ = routes.InitRouter(router)
 
 	http.ListenAndServe("localhost:8988", router)
 

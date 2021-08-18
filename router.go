@@ -1,6 +1,7 @@
 package drouter
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -30,19 +31,18 @@ type EndPoint struct {
 
 type DRouter struct {
 	Host        string
-	NextNodes   []RouterNode
-	InitPath    string
-	InitHandler *InitWrapper
+	Verbose     bool
+	InitWrapper *InitWrapper
+	RouterNode
 }
 
-func (d *DRouter) InitRouter() (*httprouter.Router, error) {
-	router := httprouter.New()
+func (d *DRouter) InitRouter(router *httprouter.Router) error {
 
 	var localInitHandler Middleware
-	if d.InitHandler != nil {
+	if d.InitWrapper != nil {
 		localInitHandler = func(userdata interface{}, rw http.ResponseWriter, r *http.Request, p RequestInfo) (interface{}, bool) {
 			var ok bool
-			userdata, ok = (*d.InitHandler)(rw, r, p)
+			userdata, ok = (*d.InitWrapper)(rw, r, p)
 			if !ok {
 				return userdata, false
 			}
@@ -53,15 +53,16 @@ func (d *DRouter) InitRouter() (*httprouter.Router, error) {
 		}
 	}
 	for i := 0; i < len(d.NextNodes); i++ {
-		d.NextNodes[i].CreateRoutes(router, d.InitPath, &localInitHandler)
+		d.NextNodes[i].CreateRoutes(router, d.PathPart, &localInitHandler, d.Verbose)
 	}
 
-	return router, nil
+	return nil
 }
 
+// TODO release version without checks
 //func (d *DRouter) InitRouterRelease() (*httprouter.Router, error)
 
-func (n *RouterNode) CreateRoutes(router *httprouter.Router, path string, wrapper *Middleware) {
+func (n *RouterNode) CreateRoutes(router *httprouter.Router, path string, wrapper *Middleware, verbose bool) {
 	var localwrapper Middleware = func(userdata interface{}, w http.ResponseWriter, r *http.Request, p RequestInfo) (interface{}, bool) {
 		var ok bool
 		if wrapper != nil {
@@ -99,9 +100,12 @@ func (n *RouterNode) CreateRoutes(router *httprouter.Router, path string, wrappe
 			n.EndPoint.Handler(userdata, rw, r, info)
 		}
 		router.Handle(n.EndPoint.Method, route, endpoint)
+		if verbose {
+			fmt.Printf("Route created: %s", route)
+		}
 	}
 
 	for i := 0; i < len(n.NextNodes); i++ {
-		n.NextNodes[i].CreateRoutes(router, route, &localwrapper)
+		n.NextNodes[i].CreateRoutes(router, route, &localwrapper, verbose)
 	}
 }
